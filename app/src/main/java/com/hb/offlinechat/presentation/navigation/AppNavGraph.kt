@@ -10,6 +10,7 @@ import com.hb.offlinechat.presentation.screens.ChatGroupScreen
 import com.hb.offlinechat.presentation.screens.ChatOneToOneScreen
 import com.hb.offlinechat.presentation.screens.ConnectionScreen
 import com.hb.offlinechat.presentation.screens.FileSharingScreen
+import com.hb.offlinechat.presentation.screens.GroupListScreen
 import com.hb.offlinechat.presentation.screens.HomeScreen
 import com.hb.offlinechat.presentation.screens.NearbyDevicesScreen
 import com.hb.offlinechat.presentation.screens.PrivacySettingsScreen
@@ -27,9 +28,8 @@ import com.hb.offlinechat.presentation.screens.WelcomeScreen
 @Composable
 fun AppNavGraph(
     onUserReady: () -> Unit = {},
-    onConnectionRequested: (String, String) -> Unit = { _, _ -> },
-    onChatOpened: (String) -> Unit = {},
-    onGroupOpened: (String) -> Unit = {}
+    darkTheme: Boolean = true,
+    onToggleTheme: () -> Unit = {}
 ) {
     val navController = rememberNavController()
 
@@ -64,7 +64,10 @@ fun AppNavGraph(
                 onNearbyDevices = { navController.navigate(Routes.NearbyDevices) },
                 onConnection = { navController.navigate(Routes.Connection) },
                 onOpenChat = { deviceId -> navController.navigate("${Routes.ChatOneToOne}/$deviceId") },
-                onOpenGroup = { groupId -> navController.navigate("${Routes.ChatGroup}/$groupId") },
+                onOpenGroup = { groupId ->
+                    if (groupId.isBlank()) navController.navigate(Routes.GroupList)
+                    else navController.navigate("${Routes.ChatGroup}/$groupId")
+                },
                 onFileShare = { navController.navigate(Routes.FileSharing) },
                 onVoiceMessages = { navController.navigate(Routes.VoiceMessages) },
                 onSettings = { navController.navigate(Routes.Settings) },
@@ -75,11 +78,9 @@ fun AppNavGraph(
         composable(Routes.NearbyDevices) {
             NearbyDevicesScreen(
                 onBack = { navController.popBackStack() },
-                onConnect = { deviceId, deviceName ->
+                onConnect = { deviceId, _ ->
                     navController.navigate("${Routes.Connection}/$deviceId")
-                    onConnectionRequested(deviceId, deviceName)
-                },
-                onRefresh = {}
+                }
             )
         }
 
@@ -97,6 +98,13 @@ fun AppNavGraph(
             ChatOneToOneScreen(
                 deviceId = deviceId,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.GroupList) {
+            GroupListScreen(
+                onBack = { navController.popBackStack() },
+                onOpenGroup = { groupId -> navController.navigate("${Routes.ChatGroup}/$groupId") }
             )
         }
 
@@ -121,19 +129,16 @@ fun AppNavGraph(
         }
 
         composable(Routes.VoiceCall) {
-            VoiceCallScreen(
-                onBack = { navController.popBackStack() },
-                onAccept = {},
-                onReject = {},
-                onEnd = {}
-            )
+            VoiceCallScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.Settings) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onPrivacy = { navController.navigate(Routes.PrivacySettings) },
-                onAbout = { navController.navigate(Routes.About) }
+                onAbout = { navController.navigate(Routes.About) },
+                darkTheme = darkTheme,
+                onToggleTheme = onToggleTheme
             )
         }
 

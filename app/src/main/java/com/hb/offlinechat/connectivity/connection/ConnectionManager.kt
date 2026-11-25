@@ -8,11 +8,14 @@ import com.hb.offlinechat.core.security.ReplayProtection
 import com.hb.offlinechat.domain.model.ConnectionState
 import com.hb.offlinechat.domain.model.Device
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.shareIn
 import java.util.UUID
 import javax.crypto.SecretKey
 
@@ -23,7 +26,8 @@ import javax.crypto.SecretKey
  */
 class ConnectionManager(
     private val transport: NearbyTransport,
-    private val identity: DeviceIdentity
+    private val identity: DeviceIdentity,
+    scope: CoroutineScope
 ) {
     private val replay = ReplayProtection()
     private val sessionKeys = mutableMapOf<String, SecretKey>()
@@ -53,6 +57,10 @@ class ConnectionManager(
 
     fun publicKeyForDevice(deviceId: String): String =
         endpointIdForDevice(deviceId)?.let { transport.publicKeyFor(it) } ?: ""
+
+    fun disconnectDevice(deviceId: String) {
+        endpointIdForDevice(deviceId)?.let { transport.disconnect(it) }
+    }
 
     fun stop() {
         transport.stop()
@@ -116,10 +124,14 @@ class ConnectionManager(
         return sent
     }
 
-    /** All authenticated, replay-checked incoming wire messages. */
-    val incomingWire: Flow<WireMessage> = transport.payloads.mapNotNull { (endpointId, bytes) ->
-        decryptWire(bytes, transport.publicKeyFor(endpointId))
-    }
+    /**
+     * All authenticated, replay-checked incoming wire messages.
+     * Decoded exactly once so replay protection is not consumed by multiple
+     * feature collectors (chat, files, groups, calls).
+     */
+    val incomingWire: SharedFlow<WireMessage> = transport.payloads
+        .mapNotNull { (endpointId, bytes) -> decryptWire(bytes, transport.publicKeyFor(endpointId)) }
+        .shareIn(scope, SharingStarted.WhileSubscribed(5000), replay = 0)
 
     private fun decryptWire(bytes: ByteArray, peerPublicKey: String): WireMessage? {
         return try {

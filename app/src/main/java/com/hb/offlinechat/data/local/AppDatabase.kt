@@ -112,6 +112,9 @@ interface DeviceDao {
     @Query("SELECT * FROM devices ORDER BY lastSeen DESC")
     fun observeDevices(): Flow<List<DeviceEntity>>
 
+    @Query("SELECT * FROM devices WHERE deviceId = :deviceId LIMIT 1")
+    suspend fun getDevice(deviceId: String): DeviceEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(device: DeviceEntity)
 
@@ -162,6 +165,9 @@ interface MessageDao {
 interface GroupDao {
     @Query("SELECT * FROM groups")
     fun observeGroups(): Flow<List<GroupEntity>>
+
+    @Query("SELECT * FROM groups WHERE groupId = :groupId LIMIT 1")
+    suspend fun getGroup(groupId: String): GroupEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGroup(group: GroupEntity)

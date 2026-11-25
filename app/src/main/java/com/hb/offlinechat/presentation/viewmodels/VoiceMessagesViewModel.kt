@@ -24,7 +24,7 @@ import java.util.Locale
 data class PlayableVoice(val path: String, val name: String, val peerId: String, val size: Long)
 
 /** ViewModel for real voice message recording, transfer and playback. */
-class VoiceMessagesViewModel(app: Application) : AndroidViewModel(app) {
+class VoiceMessagesViewModel(private val app: Application) : AndroidViewModel(app) {
     private val container = AppContainer.getInstance(app)
     private val recorder = VoiceRecorder()
     private val player = VoicePlayer()

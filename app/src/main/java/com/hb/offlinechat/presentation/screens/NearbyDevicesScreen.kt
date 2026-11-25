@@ -1,7 +1,6 @@
 package com.hb.offlinechat.presentation.screens
 
 import android.Manifest
-import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -48,8 +47,7 @@ import com.hb.offlinechat.presentation.viewmodels.NearbyDevicesViewModel
 @Composable
 fun NearbyDevicesScreen(
     onBack: () -> Unit,
-    onConnect: (String, String) -> Unit,
-    onRefresh: () -> Unit
+    onConnect: (String, String) -> Unit
 ) {
     val context = LocalContext.current
     val permissionManager = remember { PermissionManager(context) }
@@ -58,10 +56,11 @@ fun NearbyDevicesScreen(
     val devices by vm.devices.collectAsStateWithLifecycle(emptyList())
     val state by vm.connectionState.collectAsStateWithLifecycle(ConnectionState.DISCONNECTED)
     val error by vm.error.collectAsStateWithLifecycle(null)
+    val pending by vm.pendingConnection.collectAsStateWithLifecycle(null)
+    val connectedEndpoints by vm.connectedEndpoints.collectAsStateWithLifecycle(emptySet())
 
     var granted by remember { mutableStateOf(permissionManager.allDiscoveryGranted()) }
     var showRationale by remember { mutableStateOf(false) }
-    var launchSettings by remember { mutableStateOf(false) }
 
     val permissions = remember { RequiredPermissions.forDiscovery().toTypedArray() }
     val launcher = rememberLauncherForActivityResult(
@@ -76,10 +75,6 @@ fun NearbyDevicesScreen(
         if (granted) vm.startDiscovery() else launcher.launch(permissions)
     }
 
-    DisposableEffect(Unit) {
-        onDispose { vm.stop() }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -92,7 +87,6 @@ fun NearbyDevicesScreen(
                 actions = {
                     IconButton(onClick = {
                         if (granted) vm.startDiscovery() else launcher.launch(permissions)
-                        onRefresh()
                     }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                     }
@@ -157,11 +151,33 @@ fun NearbyDevicesScreen(
                             Text("${device.transportType} · ${device.deviceId.take(8)}",
                                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text("Connect", color = MaterialTheme.colorScheme.primary)
+                        val isConnected = devices.firstOrNull { it.deviceId == device.deviceId }
+                            ?.let { vm.endpointIdForDevice(it.deviceId) in connectedEndpoints } == true
+                        Text(
+                            if (isConnected) "Connected ✓" else "Connect",
+                            color = if (isConnected) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
         }
+    }
+
+    pending?.let { request ->
+        AlertDialog(
+            onDismissRequest = { vm.rejectRequest(request.endpointId) },
+            title = { Text("Connection request") },
+            text = {
+                Text("${request.info.deviceName} (${request.info.deviceId.take(8)}) wants to connect.")
+            },
+            confirmButton = {
+                Button(onClick = { vm.acceptRequest(request.endpointId) }) { Text("Accept") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.rejectRequest(request.endpointId) }) { Text("Reject") }
+            }
+        )
     }
 
     if (showRationale) {

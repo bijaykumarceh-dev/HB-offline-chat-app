@@ -13,6 +13,7 @@ object Routes {
     const val Connection = "connection"
     const val ChatOneToOne = "chat_one_to_one"
     const val ChatGroup = "chat_group"
+    const val GroupList = "group_list"
     const val FileSharing = "file_sharing"
     const val VoiceMessages = "voice_messages"
     const val VoiceCall = "voice_call"

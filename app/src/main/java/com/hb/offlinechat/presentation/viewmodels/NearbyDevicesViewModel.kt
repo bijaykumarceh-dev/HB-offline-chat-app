@@ -15,6 +15,8 @@ class NearbyDevicesViewModel(app: Application) : AndroidViewModel(app) {
     val devices = connection.discoveredDevices
     val connectionState = connection.connectionState
     val error = connection.error
+    val pendingConnection = connection.pendingConnection
+    val connectedEndpoints = connection.connectedEndpoints
     val myDeviceName: String get() = connection.myDeviceName
 
     fun startDiscovery() {
@@ -25,6 +27,11 @@ class NearbyDevicesViewModel(app: Application) : AndroidViewModel(app) {
         val endpointId = connection.endpointIdForDevice(device.deviceId)
         if (endpointId != null) connection.requestConnection(endpointId)
     }
+
+    fun endpointIdForDevice(deviceId: String): String? = connection.endpointIdForDevice(deviceId)
+
+    fun acceptRequest(endpointId: String) = connection.acceptConnection(endpointId)
+    fun rejectRequest(endpointId: String) = connection.rejectConnection(endpointId)
 
     fun stop() {
         viewModelScope.launch { connection.stop() }

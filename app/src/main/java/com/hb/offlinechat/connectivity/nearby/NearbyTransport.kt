@@ -19,6 +19,7 @@ import com.hb.offlinechat.domain.model.ConnectionState
 import com.hb.offlinechat.domain.model.Device
 import com.hb.offlinechat.domain.model.EndpointInfo
 import com.hb.offlinechat.domain.model.TransportType
+import com.hb.offlinechat.service.notification.NotificationHelper
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -43,6 +44,7 @@ class NearbyTransport(private val context: Context) {
 
     private var client: ConnectionsClient? = null
     private val endpointInfo = mutableMapOf<String, EndpointInfo>()
+    private val blockedDeviceIds = MutableStateFlow<Set<String>>(emptySet())
 
     private val _discoveredDevices = MutableStateFlow<List<Device>>(emptyList())
     val discoveredDevices: StateFlow<List<Device>> = _discoveredDevices.asStateFlow()
@@ -104,12 +106,13 @@ class NearbyTransport(private val context: Context) {
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             val parsed = parseEndpointName(info.endpointName)
-            if (parsed == null) {
+            if (parsed == null || parsed.deviceId in blockedDeviceIds.value) {
                 client?.rejectConnection(endpointId)
                 return
             }
             endpointInfo[endpointId] = parsed
             _connectionState.value = ConnectionState.VERIFYING
+            NotificationHelper.post(context, "Connection request", parsed.deviceName, 3001)
             // Surface the request; UI must explicitly accept or reject.
             _pendingConnection.value = PendingConnection(endpointId, parsed)
         }
@@ -138,6 +141,7 @@ class NearbyTransport(private val context: Context) {
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             val parsed = parseEndpointName(info.endpointName) ?: return
+            if (parsed.deviceId in blockedDeviceIds.value) return
             endpointInfo[endpointId] = parsed
             val device = Device(
                 deviceId = parsed.deviceId,
@@ -186,8 +190,13 @@ class NearbyTransport(private val context: Context) {
             }
     }
 
-    /** User-approved connection acceptance. */
+    /** User-approved connection acceptance. Blocked peers are always rejected. */
     fun acceptConnection(endpointId: String) {
+        val info = endpointInfo[endpointId]
+        if (info != null && info.deviceId in blockedDeviceIds.value) {
+            rejectConnection(endpointId)
+            return
+        }
         client?.acceptConnection(endpointId, payloadCallback)
             ?.addOnFailureListener { _error.value = "Accept failed: ${it.message}" }
     }
@@ -196,6 +205,19 @@ class NearbyTransport(private val context: Context) {
     fun rejectConnection(endpointId: String) {
         client?.rejectConnection(endpointId)
         _pendingConnection.value = null
+    }
+
+    /** Applied by DeviceRepository from the persisted block list. */
+    fun setBlockedDevices(deviceIds: Set<String>) {
+        blockedDeviceIds.value = deviceIds
+        _discoveredDevices.value = _discoveredDevices.value.filterNot { it.deviceId in deviceIds }
+        deviceIds.forEach { id ->
+            endpointInfo.entries.firstOrNull { it.value.deviceId == id }?.key?.let { endpointId ->
+                if (endpointId in _connectedEndpoints.value) {
+                    client?.disconnectFromEndpoint(endpointId)
+                }
+            }
+        }
     }
 
     fun infoFor(endpointId: String): EndpointInfo? = endpointInfo[endpointId]
@@ -215,6 +237,11 @@ class NearbyTransport(private val context: Context) {
     fun sendToAll(bytes: ByteArray) {
         val targets = _connectedEndpoints.value.toList()
         if (targets.isNotEmpty()) client?.sendPayload(targets, Payload.fromBytes(bytes))
+    }
+
+    /** Disconnect a single peer; Nearby callbacks update connection state. */
+    fun disconnect(endpointId: String) {
+        client?.disconnectFromEndpoint(endpointId)
     }
 
     fun stop() {

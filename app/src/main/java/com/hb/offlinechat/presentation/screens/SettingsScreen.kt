@@ -2,6 +2,7 @@ package com.hb.offlinechat.presentation.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,9 +15,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -27,7 +30,9 @@ import com.hb.offlinechat.presentation.theme.AppDimensions
 fun SettingsScreen(
     onBack: () -> Unit,
     onPrivacy: () -> Unit,
-    onAbout: () -> Unit
+    onAbout: () -> Unit,
+    darkTheme: Boolean,
+    onToggleTheme: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -40,7 +45,22 @@ fun SettingsScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(AppDimensions.spacingM)) {
-            SettingsItem(title = "Privacy & security", subtitle = "Device verification, blocking", onClick = onPrivacy)
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = AppDimensions.spacingS),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(AppDimensions.spacingM),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Dark theme", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Neon dark palette", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    }
+                    Switch(checked = darkTheme, onCheckedChange = { onToggleTheme() })
+                }
+            }
+            SettingsItem(title = "Privacy & security", subtitle = "Verification, blocking and trust", onClick = onPrivacy)
             SettingsItem(title = "About application", subtitle = "Version and limitations", onClick = onAbout)
         }
     }

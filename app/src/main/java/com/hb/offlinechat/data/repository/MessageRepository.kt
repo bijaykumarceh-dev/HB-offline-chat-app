@@ -1,10 +1,14 @@
 package com.hb.offlinechat.data.repository
 
+import android.content.Context
 import com.hb.offlinechat.connectivity.connection.ConnectionManager
+import com.hb.offlinechat.data.local.ConversationDao
+import com.hb.offlinechat.data.local.ConversationEntity
 import com.hb.offlinechat.data.local.MessageDao
 import com.hb.offlinechat.data.local.MessageEntity
 import com.hb.offlinechat.domain.model.DeliveryStatus
 import com.hb.offlinechat.domain.model.MessageType
+import com.hb.offlinechat.service.notification.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -16,7 +20,9 @@ import java.util.UUID
  * connection, and keeps an offline outgoing queue for disconnected peers.
  */
 class MessageRepository(
+    private val context: Context,
     private val messageDao: MessageDao,
+    private val conversationDao: ConversationDao,
     private val connectionManager: ConnectionManager,
     private val scope: CoroutineScope
 ) {
@@ -38,6 +44,22 @@ class MessageRepository(
                         timestamp = incoming.timestamp,
                         deliveryStatus = DeliveryStatus.DELIVERED.name
                     )
+                )
+                conversationDao.upsert(
+                    ConversationEntity(
+                        conversationId = conversationId,
+                        peerId = incoming.senderId,
+                        title = incoming.senderId.take(8),
+                        isGroup = false,
+                        lastMessage = incoming.text,
+                        lastMessageAt = incoming.timestamp
+                    )
+                )
+                NotificationHelper.post(
+                    context,
+                    "Message from ${incoming.senderId.take(8)}",
+                    incoming.text,
+                    incoming.senderId.hashCode()
                 )
             }
         }
@@ -74,6 +96,16 @@ class MessageRepository(
             deliveryStatus = if (envelope != null) DeliveryStatus.SENT.name else DeliveryStatus.QUEUED.name
         )
         messageDao.upsert(entity)
+        conversationDao.upsert(
+            ConversationEntity(
+                conversationId = conversationId(peerId),
+                peerId = peerId,
+                title = peerId.take(8),
+                isGroup = false,
+                lastMessage = text,
+                lastMessageAt = now
+            )
+        )
         return entity
     }
 

@@ -1,7 +1,9 @@
 package com.hb.offlinechat.presentation.screens
 
+import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -17,14 +19,21 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hb.offlinechat.presentation.theme.AppDimensions
+import com.hb.offlinechat.presentation.viewmodels.ConnectionViewModel
 
+/** Live connection details for one nearby peer. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectionScreen(
@@ -32,6 +41,11 @@ fun ConnectionScreen(
     onBack: () -> Unit,
     onChat: () -> Unit
 ) {
+    val app = LocalContext.current.applicationContext as Application
+    val vm: ConnectionViewModel = viewModel(factory = ConnectionViewModel.factory(app, deviceId))
+    val state by vm.state.collectAsStateWithLifecycle()
+    val connected by vm.isConnected.collectAsStateWithLifecycle(false)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -49,9 +63,7 @@ fun ConnectionScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(AppDimensions.spacingL)) {
                     Text(
                         "Device: ${deviceId.take(8)}",
@@ -60,13 +72,10 @@ fun ConnectionScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(AppDimensions.spacingS))
+                    Text("State: $state", color = MaterialTheme.colorScheme.secondary, fontSize = 14.sp)
                     Text(
-                        "State: DISCONNECTED",
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        "Connection engine is implemented in Phase 5.",
+                        if (connected) "Encrypted peer-to-peer session is active."
+                        else "Waiting for Nearby Connections to finish the handshake.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = AppDimensions.spacingS)
@@ -74,7 +83,14 @@ fun ConnectionScreen(
                 }
             }
             Spacer(Modifier.height(AppDimensions.spacingL))
-            Button(onClick = onChat) { Text("Open chat") }
+            Row(horizontalArrangement = Arrangement.spacedBy(AppDimensions.spacingS)) {
+                if (!connected) {
+                    Button(onClick = { vm.retry() }) { Text("Retry") }
+                } else {
+                    Button(onClick = onChat) { Text("Open chat") }
+                    TextButton(onClick = { vm.disconnect() }) { Text("Disconnect") }
+                }
+            }
         }
     }
 }

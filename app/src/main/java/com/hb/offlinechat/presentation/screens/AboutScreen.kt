@@ -35,8 +35,8 @@ fun AboutScreen(onBack: () -> Unit) {
             Text("HB Offline Chat", fontWeight = FontWeight.Bold, fontSize = 24.sp, color = MaterialTheme.colorScheme.primary)
             Text("Version 1.0.0", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = AppDimensions.spacingS))
             Text(
-                "Direct peer-to-peer communication using Bluetooth, Wi-Fi Direct and Google Nearby Connections. " +
-                    "No internet, SIM or central server required.",
+                "Direct peer-to-peer communication using Google Nearby Connections over local Bluetooth / Wi-Fi links. " +
+                    "No internet, SIM or central server required. Google Play services must be available on both devices.",
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = AppDimensions.spacingM)
             )
